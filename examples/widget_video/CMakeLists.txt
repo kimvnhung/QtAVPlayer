@@ -22,6 +22,9 @@ endif()
 include_directories(../../src/)
 set(QT_AVPLAYER_DIR ../../src/QtAVPlayer/)
 include(../../src/QtAVPlayer/QtAVPlayer.cmake)
+if(WIN32)
+    include_directories(${FFMPEG_INCLUDES})
+endif()
 
 set(SOURCES ${QtAVPlayer_SOURCES} main.cpp)
 
@@ -39,4 +42,5 @@ else()
     set(LIBS ${LIBS} Qt5::Core Qt5::Gui Qt5::Multimedia Qt5::MultimediaWidgets)
 endif()
 
+message("${LIBS}")
 target_link_libraries(${PROJECT_NAME} ${LIBS})
