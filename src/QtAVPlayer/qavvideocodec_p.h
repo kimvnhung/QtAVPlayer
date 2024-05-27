@@ -28,7 +28,7 @@ class QAVHWDevice;
 class QAVVideoCodec : public QAVFrameCodec
 {
 public:
-    QAVVideoCodec();
+    QAVVideoCodec(int flags = 0, int flag2s = 0);
     ~QAVVideoCodec();
 
     void setDevice(const QSharedPointer<QAVHWDevice> &d);

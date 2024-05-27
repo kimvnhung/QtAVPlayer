@@ -71,9 +71,9 @@ static AVPixelFormat negotiate_pixel_format(AVCodecContext *c, const AVPixelForm
     }
 
     if (!supported.isEmpty()) {
-        qDebug() << c->codec->name << ": supported hardware device contexts:";
-        for (auto a: supported)
-            qDebug() << "   " << av_hwdevice_get_type_name(a);
+        // qDebug() << c->codec->name << ": supported hardware device contexts:";
+        // for (auto a: supported)
+            // qDebug() << "   " << av_hwdevice_get_type_name(a);
     } else {
         qWarning() << "None of the hardware accelerations are supported";
     }
@@ -89,15 +89,15 @@ static AVPixelFormat negotiate_pixel_format(AVCodecContext *c, const AVPixelForm
         softwareFormats.append(f[i]);
     }
 
-    qDebug() << "Available pixel formats:";
+    // qDebug() << "Available pixel formats:";
     for (auto a : softwareFormats) {
         auto dsc = av_pix_fmt_desc_get(a);
-        qDebug() << "  " << dsc->name << ": AVPixelFormat(" << a << ")";
+        // qDebug() << "  " << dsc->name << ": AVPixelFormat(" << a << ")";
     }
 
     for (auto a : hardwareFormats) {
         auto dsc = av_pix_fmt_desc_get(a);
-        qDebug() << "  " << dsc->name << ": AVPixelFormat(" << a << ")";
+        // qDebug() << "  " << dsc->name << ": AVPixelFormat(" << a << ")";
     }
 
     AVPixelFormat pf = !softwareFormats.isEmpty() ? softwareFormats[0] : AV_PIX_FMT_NONE;
@@ -114,16 +114,16 @@ static AVPixelFormat negotiate_pixel_format(AVCodecContext *c, const AVPixelForm
     }
 
     auto dsc = av_pix_fmt_desc_get(pf);
-    if (dsc)
-        qDebug() << "Using" << decStr << "decoding in" << dsc->name;
-    else
+    if (!dsc)
+        // qDebug() << "Using" << decStr << "decoding in" << dsc->name;
+    // else
         qDebug() << "None of the pixel formats";
 
     return pf;
 }
 
-QAVVideoCodec::QAVVideoCodec()
-    : QAVFrameCodec(*new QAVVideoCodecPrivate)
+QAVVideoCodec::QAVVideoCodec(int flags, int flag2s)
+    : QAVFrameCodec(*new QAVVideoCodecPrivate, flags, flag2s)
 {
     d_ptr->avctx->opaque = d_ptr.get();
     d_ptr->avctx->get_format = negotiate_pixel_format;

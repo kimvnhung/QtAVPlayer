@@ -18,14 +18,17 @@ extern "C" {
 
 QT_BEGIN_NAMESPACE
 
-QAVCodec::QAVCodec()
-    : QAVCodec(*new QAVCodecPrivate)
+QAVCodec::QAVCodec(int flags,int flag2s)
+    : QAVCodec(*new QAVCodecPrivate,flags,flag2s)
 {
 }
 
-QAVCodec::QAVCodec(QAVCodecPrivate &d)
+QAVCodec::QAVCodec(QAVCodecPrivate &d, int flags, int flag2s)
     : d_ptr(&d)
 {
+    d_ptr->flags |= flags;
+    d_ptr->flag2s |= flag2s;
+
     d_ptr->avctx = avcodec_alloc_context3(nullptr);
 }
 
@@ -67,6 +70,10 @@ bool QAVCodec::open(AVStream *stream)
 
     av_opt_set_int(d->avctx, "refcounted_frames", true, 0);
     av_opt_set_int(d->avctx, "threads", 1, 0);
+    d->avctx->flags |= d->flags;
+    d->avctx->flags2 |= d->flag2s;
+    // d->avctx->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+
     ret = avcodec_open2(d->avctx, d->codec, nullptr);
     if (ret < 0) {
         qWarning() << "Could not open the codec:" << d->codec->name << ret;

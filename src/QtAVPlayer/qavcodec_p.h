@@ -49,8 +49,8 @@ public:
     virtual int read(QAVStreamFrame &frame) = 0;
 
 protected:
-    QAVCodec();
-    QAVCodec(QAVCodecPrivate &d);
+    QAVCodec(int flags = 0, int flag2s = 0);
+    QAVCodec(QAVCodecPrivate &d, int flags = 0, int flag2s = 0);
     std::unique_ptr<QAVCodecPrivate> d_ptr;
     Q_DECLARE_PRIVATE(QAVCodec)
 private:

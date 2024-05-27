@@ -12,6 +12,7 @@
 #include "qavhwdevice_p.h"
 #include "qaviodevice.h"
 #include <QtAVPlayer/qtavplayerglobal.h>
+#include <QThread>
 
 #if defined(QT_AVPLAYER_VA_X11) && QT_CONFIG(opengl)
 #include "qavhwdevice_vaapi_x11_glx_p.h"
@@ -56,14 +57,17 @@ extern "C" {
 #endif
 }
 
+#define DEBUG(...) qDebug()<<"["<<id()<<":"<<QThread::currentThreadId()<<"]"<<__FUNCTION__<<__LINE__<<__VA_ARGS__;
+
 QT_BEGIN_NAMESPACE
 
 class QAVDemuxerPrivate
 {
     Q_DECLARE_PUBLIC(QAVDemuxer)
 public:
-    QAVDemuxerPrivate(QAVDemuxer *q)
+    QAVDemuxerPrivate(QAVDemuxer *q, QString pId)
         : q_ptr(q)
+        , m_id(pId)
     {
     }
 
@@ -87,7 +91,20 @@ public:
     bool eof = false;
     QList<QAVPacket> packets;
     QString bsfs;
+
+    QString m_id;
+    QString id() const;
 };
+
+QString QAVDemuxerPrivate::id() const
+{
+    return m_id;
+}
+
+QString QAVDemuxer::id() const
+{
+    return d_ptr->id();
+}
 
 static int decode_interrupt_cb(void *ctx)
 {
@@ -95,8 +112,8 @@ static int decode_interrupt_cb(void *ctx)
     return d ? int(d->abortRequest) : 0;
 }
 
-QAVDemuxer::QAVDemuxer()
-    : d_ptr(new QAVDemuxerPrivate(this))
+QAVDemuxer::QAVDemuxer(QString id)
+    : d_ptr(new QAVDemuxerPrivate(this,id))
 {
     static bool loaded = false;
     if (!loaded) {
@@ -169,9 +186,9 @@ static int setup_video_codec(const QString &inputVideoCodec, AVStream *stream, Q
         AVBufferRef *hw_device_ctx = nullptr;
         for (auto &device : devices) {
             auto deviceName = av_hwdevice_get_type_name(device->type());
-            qDebug() << "Creating hardware device context:" << deviceName;
+            // qDebug() << "Creating hardware device context:" << deviceName;
             if (av_hwdevice_ctx_create(&hw_device_ctx, device->type(), nullptr, opts, 0) >= 0) {
-                qDebug() << "Using hardware device context:" << deviceName;
+                // qDebug() << "Using hardware device context:" << deviceName;
                 codec.avctx()->hw_device_ctx = hw_device_ctx;
                 codec.avctx()->pix_fmt = device->format();
                 codec.setDevice(device);
@@ -203,7 +220,6 @@ static void log_callback(void *ptr, int level, const char *fmt, va_list vl)
     av_log_format_line(ptr, level, fmt, vl2, line, sizeof(line), &print_prefix);
     va_end(vl2);
 
-    qDebug() << "FFmpeg:" << line;
 }
 
 QStringList QAVDemuxer::supportedFormats()
@@ -307,6 +323,7 @@ static int apply_bsf(const QString &bsf, AVFormatContext *ctx, AVBSFContext *&bs
 
 int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
 {
+    // DEBUG(url);
     Q_D(QAVDemuxer);
     QMutexLocker locker(&d->mutex);
 
@@ -316,6 +333,36 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
     d->ctx->flags |= AVFMT_FLAG_GENPTS;
     d->ctx->interrupt_callback.callback = decode_interrupt_cb;
     d->ctx->interrupt_callback.opaque = d;
+// add to reduce delay
+    if(d->inputOptions.contains("AVFlags")){
+        bool ok;
+        int flags = d->inputOptions.value("AVFlags").toInt(&ok);
+        if(ok)
+            d->ctx->flags |= flags;
+    }
+
+    if(d->inputOptions.contains("max_analyze_duration")){
+        bool ok;
+        int num = d->inputOptions.value("max_analyze_duration").toInt(&ok);
+        if(ok)
+            d->ctx->max_analyze_duration = num;
+    }
+
+    if(d->inputOptions.contains("probesize")){
+        bool ok;
+        int num = d->inputOptions.value("probesize").toInt(&ok);
+        if(ok)
+            d->ctx->probesize = num;
+    }
+
+    if(d->inputOptions.contains("max_delay")){
+        bool ok;
+        int num = d->inputOptions.value("max_delay").toInt(&ok);
+        if(ok)
+            d->ctx->max_delay = num;
+    }
+
+//
     if (dev) {
         d->ctx->pb = dev->ctx();
         d->ctx->flags |= AVFMT_FLAG_CUSTOM_IO;
@@ -334,14 +381,17 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
         }
     }
 
+    // DEBUG(url);
     AVDictionary *opts = nullptr;
     for (const auto & key: d->inputOptions.keys())
         av_dict_set(&opts, key.toUtf8().constData(), d->inputOptions[key].toUtf8().constData(), 0);
     locker.unlock();
+    // DEBUG(url);
     int ret = avformat_open_input(&d->ctx, url.toUtf8().constData(), inputFormat, &opts);
     if (ret < 0)
         return ret;
 
+    // DEBUG(url);
     ret = avformat_find_stream_info(d->ctx, NULL);
     if (ret < 0)
         return ret;
@@ -358,6 +408,7 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
     d->seekable = true;
 #endif
 
+    // DEBUG(url);
     ret = resetCodecs();
     if (ret < 0)
         return ret;
@@ -398,6 +449,7 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
     if (!d->bsfs.isEmpty())
         return apply_bsf(d->bsfs, d->ctx, d->bsf_ctx);
 
+    // DEBUG(url);
     return 0;
 }
 
@@ -410,21 +462,33 @@ int QAVDemuxer::resetCodecs()
             qWarning() << "Could not find codecpar";
             return AVERROR(EINVAL);
         }
+        int flags = 0;
+        int flag2s = 0;
+        if(d->inputOptions.contains("AVCodecFlags")){
+            bool ok;
+            flags = d->inputOptions.value("AVCodecFlags").toInt(&ok);
+        }
+
+        if(d->inputOptions.contains("AVCodecFlag2s")){
+            bool ok;
+            flag2s = d->inputOptions.value("AVCodecFlag2s").toInt(&ok);
+        }
+
         const AVMediaType type = d->ctx->streams[i]->codecpar->codec_type;
         switch (type) {
             case AVMEDIA_TYPE_VIDEO:
             {
-                QSharedPointer<QAVCodec> codec(new QAVVideoCodec);
+            QSharedPointer<QAVCodec> codec(new QAVVideoCodec(flags,flag2s));
                 d->availableStreams.push_back({ int(i), d->ctx, codec });
                 ret = setup_video_codec(d->inputVideoCodec, d->ctx->streams[i], *static_cast<QAVVideoCodec *>(codec.data()));
             } break;
             case AVMEDIA_TYPE_AUDIO:
-                d->availableStreams.push_back({ int(i), d->ctx, QSharedPointer<QAVCodec>(new QAVAudioCodec) });
+                d->availableStreams.push_back({ int(i), d->ctx, QSharedPointer<QAVCodec>(new QAVAudioCodec(flags,flag2s)) });
                 if (!d->availableStreams.last().codec()->open(d->ctx->streams[i]))
                     qWarning() << "Could not open audio codec for stream:" << i;
                 break;
             case AVMEDIA_TYPE_SUBTITLE:
-                d->availableStreams.push_back({ int(i), d->ctx, QSharedPointer<QAVCodec>(new QAVSubtitleCodec) });
+                d->availableStreams.push_back({ int(i), d->ctx, QSharedPointer<QAVCodec>(new QAVSubtitleCodec(flags,flag2s)) });
                 if (!d->availableStreams.last().codec()->open(d->ctx->streams[i]))
                     qWarning() << "Could not open subtitle codec for stream:" << i;
                 break;
@@ -609,16 +673,28 @@ bool QAVDemuxer::eof() const
 
 QAVPacket QAVDemuxer::read()
 {
+    // DEBUG("");
     Q_D(QAVDemuxer);
     {
         QMutexLocker locker(&d->mutex);
         if (!d->packets.isEmpty())
+        {
+            // DEBUG("");
             return d->packets.takeFirst();
+        }
 
         if (!d->ctx || d->eof)
+        {
+            if(d->eof){
+                // DEBUG("");
+            }else {
+                // DEBUG("");
+            }
             return {};
+        }
     }
 
+    // DEBUG("");
     QAVPacket pkt;
     bool eof = false;
     int ret = av_read_frame(d->ctx, pkt.packet());
@@ -627,9 +703,11 @@ QAVPacket QAVDemuxer::read()
             eof = true;
         } else {
             qDebug() << "av_read_frame: unexpected result:" << ret;
+            // DEBUG("end");
             return {};
         }
     }
+    // DEBUG("");
     {
         QMutexLocker locker(&d->mutex);
         d->eof = eof;
@@ -643,8 +721,10 @@ QAVPacket QAVDemuxer::read()
             }
             if (ret < 0 && ret != AVERROR_EOF && ret != AVERROR(EAGAIN)) {
                 qWarning() << "Error applying bitstream filters to an output:" << ret;
+                // DEBUG("end");
                 return {};
             }
+            // DEBUG("end");
             return !d->packets.isEmpty() ? d->packets.takeFirst() : QAVPacket{};
         }
     }

@@ -26,8 +26,8 @@ public:
     int gotOutput = 0;
 };
 
-QAVSubtitleCodec::QAVSubtitleCodec()
-    : QAVCodec(*new QAVSubtitleCodecPrivate(this))
+QAVSubtitleCodec::QAVSubtitleCodec(int flags, int flag2s)
+    : QAVCodec(*new QAVSubtitleCodecPrivate(this),flags,flag2s)
 {
 }
 
