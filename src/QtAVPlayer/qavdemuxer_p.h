@@ -42,9 +42,11 @@ struct AVFormatContext;
 class QAVDemuxer
 {
 public:
-    QAVDemuxer();
+    QAVDemuxer(QString id = "");
     ~QAVDemuxer();
 
+
+    QString id() const;
     void abort(bool stop = true);
     int load(const QString &url, QAVIODevice *dev = nullptr);
     void unload();

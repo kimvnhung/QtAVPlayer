@@ -27,7 +27,7 @@ QT_BEGIN_NAMESPACE
 class QAVAudioCodec : public QAVFrameCodec
 {
 public:
-    QAVAudioCodec();
+    QAVAudioCodec(int flags = 0, int flag2s = 0);
     QAVAudioFormat audioFormat() const;
 
 private:

@@ -34,6 +34,8 @@ public:
     AVCodecContext *avctx = nullptr;
     const AVCodec *codec = nullptr;
     AVStream *stream = nullptr;
+    int flags = 0;
+    int flag2s = 0;
 };
 
 QT_END_NAMESPACE
