@@ -1,0 +1,3 @@
+[submodule "src/ffmpeg"]
+	path = src/ffmpeg
+	url = https://gitlab.ai-vlab.com/gpstech/vms/lib_ffmpeg.git
