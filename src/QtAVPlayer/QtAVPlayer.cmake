@@ -82,6 +82,7 @@ set(QtAVPlayer_PUBLIC_HEADERS
     ${QT_AVPLAYER_DIR}/qtavplayerglobal.h
     ${QT_AVPLAYER_DIR}/qavstream.h
     ${QT_AVPLAYER_DIR}/qavplayer.h
+    ${QT_AVPLAYER_DIR}/qavframeconsumer.h
 )
 
 set(QtAVPlayer_SOURCES
