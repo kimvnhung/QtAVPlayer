@@ -321,7 +321,7 @@ public:
             return {};
 
         if (!m_texture) {
-            if (!frame())
+            if(!frame())
                 return {};
 
             if (frame().format() != AV_PIX_FMT_D3D11) {
