@@ -173,6 +173,45 @@ QAVVideoFrame QAVVideoFrame::convertTo(AVPixelFormat fmt) const
     return result;
 }
 
+QImage QAVVideoFrame::image() const
+{
+
+    // Create a SwsContext for converting pixel format if necessary.
+    SwsContext *swsContext = nullptr;
+
+    if(frame()->format != AV_PIX_FMT_RGB24) {
+        swsContext = sws_getContext(size().width(), size().height(), (AVPixelFormat)frame()->format,
+                                    size().width(), size().height(), AV_PIX_FMT_RGB24,
+                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
+
+        if (!swsContext) {
+            qWarning() << __FUNCTION__ << "Could not create SwsContext";
+            return QImage();
+        }
+    }
+
+    // Allocate memory for the QImage.
+    QImage image(frame()->width, frame()->height, QImage::Format_RGB888);
+
+    // Set the data pointer of the QImage.
+    uint8_t *destData[1] = {image.bits()};
+    int destLinesize[1] = {static_cast<int>(image.bytesPerLine())};
+    if (swsContext) {
+        sws_scale(swsContext, frame()->data, frame()->linesize,
+                  0, frame()->height, destData, destLinesize);
+    } else {
+        // If pixel format is already RGB, just copy the data.
+        memcpy(destData[0], frame()->data[0], frame()->linesize[0] * frame()->height);
+    }
+
+    // Cleanup the SwsContext if created.
+    if (swsContext) {
+        sws_freeContext(swsContext);
+    }
+
+    return image;
+}
+
 #ifdef QT_AVPLAYER_MULTIMEDIA
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 class PlanarVideoBuffer : public QAbstractPlanarVideoBuffer

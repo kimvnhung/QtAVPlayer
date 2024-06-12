@@ -8,6 +8,8 @@
 #ifndef QAVPLAYER_H
 #define QAVPLAYER_H
 
+#include "qavframeconsumer.h"
+
 #include <QtAVPlayer/qavvideoframe.h>
 #include <QtAVPlayer/qavaudioframe.h>
 #include <QtAVPlayer/qavsubtitleframe.h>
@@ -55,6 +57,8 @@ public:
 
     void setSource(const QString &url, const QSharedPointer<QAVIODevice> &dev = {});
     QString source() const;
+
+    void setVideoOutput(QAbstractAVFrameConsumer<QAVFrame> *consumer);
 
     QList<QAVStream> availableVideoStreams() const;
     QList<QAVStream> currentVideoStreams() const;

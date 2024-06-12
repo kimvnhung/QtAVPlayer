@@ -18,6 +18,7 @@
 #include "qavvideofilter_p.h"
 #include "qavaudiofilter_p.h"
 #include "qavfilters_p.h"
+#include "qavframeconsumer.h"
 #include <QtConcurrent/qtconcurrentrun.h>
 #include <QLoggingCategory>
 #include <functional>
@@ -157,6 +158,10 @@ public:
 
     QList<QString> filterDescs;
     QAVFilters filters;
+
+    mutable QMutex consumersMutex;
+    QList<QAbstractAVFrameConsumer<QAVFrame>*> consumers;
+    void addConsumer(QAbstractAVFrameConsumer<QAVFrame> *consumer);
 };
 
 static QString err_str(int err)
@@ -167,6 +172,12 @@ static QString err_str(int err)
         errbuf_ptr = strerror(AVUNERROR(err));
 
     return QString::fromUtf8(errbuf_ptr);
+}
+
+void QAVPlayerPrivate::addConsumer(QAbstractAVFrameConsumer<QAVFrame> *consumer)
+{
+    QMutexLocker locker(&consumersMutex);
+    consumers.push_back(consumer);
 }
 
 QAVPlayer::Error QAVPlayerPrivate::currentError() const
@@ -770,7 +781,13 @@ void QAVPlayerPrivate::doPlayVideo()
             videoClock,
             videoQueue,
             sync,
-            [&](const QAVFrame &frame) { Q_EMIT q_ptr->videoFrame(frame); }
+            [&](const QAVFrame &frame)
+            {
+                Q_EMIT q_ptr->videoFrame(frame);
+                // if(consumers.size() > 0)
+                //     for(auto consumer : consumers)
+                //         consumer->consume(frame);
+            }
         );
     }
 
@@ -901,6 +918,11 @@ void QAVPlayer::setSource(const QString &url, const QSharedPointer<QAVIODevice> 
 QString QAVPlayer::source() const
 {
     return d_func()->url;
+}
+
+void QAVPlayer::setVideoOutput(QAbstractAVFrameConsumer<QAVFrame> *consumer)
+{
+    d_func()->consumers.append(consumer);
 }
 
 QList<QAVStream> QAVPlayer::availableVideoStreams() const
