@@ -20,6 +20,7 @@ if(WIN32)
     set(SWSCALE_LIBRARY "${FFMPEG_DIR}/lib/swscale.lib")
 
     set(FFMPEG_INCLUDES ${FFMPEG_DIR}/include)
+    file(GLOB_RECURSE QT_AVPLAYER_DEPENDENCIES ${FFMPEG_DIR}/*.dll)
 elseif()
     find_library(AVDEVICE_LIBRARY REQUIRED NAMES avdevice)
     find_library(AVCODEC_LIBRARY REQUIRED NAMES avcodec)
