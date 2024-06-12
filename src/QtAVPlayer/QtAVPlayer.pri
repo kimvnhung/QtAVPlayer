@@ -1,5 +1,12 @@
 QT += concurrent
 CONFIG += C++1z
+win32{
+    LIBS += -L$$PWD/../ffmpeg/lib
+    LIBS += -L$$PWD/../ffmpeg/bin
+    INCLUDEPATH += $$PWD/../ffmpeg/include
+}
+
+
 LIBS += -lavcodec -lavformat -lswscale -lavutil -lswresample -lswscale -lavfilter -lavdevice
 
 PRIVATE_HEADERS += \
