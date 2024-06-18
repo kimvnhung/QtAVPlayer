@@ -278,6 +278,7 @@ void QAVPlayerPrivate::endOfFile(bool v)
 
 void QAVPlayerPrivate::setVideoFrameRate(double v)
 {
+    qDebug()<<"videoFrameRate"<<v;
     Q_Q(QAVPlayer);
     if (qFuzzyCompare(videoFrameRate, v))
         return;
@@ -783,6 +784,9 @@ void QAVPlayerPrivate::doPlayVideo()
             sync,
             [&](const QAVFrame &frame)
             {
+                // if(frame.frame())
+                //     qDebug()<<frame.frame()->width<<frame.frame()->height;
+                qDebug()<<"videoQueue: "<<videoQueue.packetsSize()<<videoQueue.decodedFramesSize();
                 Q_EMIT q_ptr->videoFrame(frame);
                 // if(consumers.size() > 0)
                 //     for(auto consumer : consumers)
