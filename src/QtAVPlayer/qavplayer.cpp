@@ -784,13 +784,7 @@ void QAVPlayerPrivate::doPlayVideo()
             sync,
             [&](const QAVFrame &frame)
             {
-                // if(frame.frame())
-                //     qDebug()<<frame.frame()->width<<frame.frame()->height;
-                qDebug()<<"videoQueue: "<<videoQueue.packetsSize()<<videoQueue.decodedFramesSize();
                 Q_EMIT q_ptr->videoFrame(frame);
-                // if(consumers.size() > 0)
-                //     for(auto consumer : consumers)
-                //         consumer->consume(frame);
             }
         );
     }
