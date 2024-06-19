@@ -143,6 +143,18 @@ public:
         return m_packets.isEmpty() && m_decodedFrames.isEmpty();
     }
 
+    int packetsSize() const
+    {
+        QMutexLocker locker(&m_mutex);
+        return m_packets.size();
+    }
+
+    int decodedFramesSize() const
+    {
+        QMutexLocker locker(&m_mutex);
+        return m_decodedFrames.size();
+    }
+
     void enqueue(const QAVPacket &packet)
     {
         QMutexLocker locker(&m_mutex);
