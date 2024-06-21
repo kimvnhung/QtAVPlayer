@@ -23,6 +23,8 @@
 #include <QLoggingCategory>
 #include <functional>
 
+#include <qtlog/log.h>
+
 extern "C" {
 #include <libavformat/avformat.h>
 }
@@ -784,6 +786,7 @@ void QAVPlayerPrivate::doPlayVideo()
             sync,
             [&](const QAVFrame &frame)
             {
+                DEBUG("Video frame pts:" );
                 Q_EMIT q_ptr->videoFrame(frame);
             }
         );

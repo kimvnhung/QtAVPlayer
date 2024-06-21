@@ -127,6 +127,7 @@ Q_SIGNALS:
     void videoStreamsChanged(const QList<QAVStream> &streams);
     void audioStreamsChanged(const QList<QAVStream> &streams);
     void subtitleStreamsChanged(const QList<QAVStream> &streams);
+    void positionChanged(qint64 pos);
     void played(qint64 pos);
     void paused(qint64 pos);
     void stopped(qint64 pos);
