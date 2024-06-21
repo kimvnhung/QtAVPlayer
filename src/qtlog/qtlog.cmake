@@ -7,11 +7,11 @@ set(CMAKE_AUTOUIC ON)
 
 set(qtlog_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/../)
 
-add_library(qtlog
+add_library(qtlog STATIC
     ${CMAKE_CURRENT_LIST_DIR}/log.h
 )
 
-target_link_libraries(qtlog
+target_link_libraries(qtlog 
     Qt${QT_VERSION_MAJOR}::Core
 )
 target_link_directories(qtlog PUBLIC ${qtlog_INCLUDES})

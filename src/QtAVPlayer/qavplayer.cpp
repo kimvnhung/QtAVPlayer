@@ -786,7 +786,7 @@ void QAVPlayerPrivate::doPlayVideo()
             sync,
             [&](const QAVFrame &frame)
             {
-                DEBUG("Video frame pts:" );
+                Q_EMIT q_ptr->positionChanged(q_ptr->position());
                 Q_EMIT q_ptr->videoFrame(frame);
             }
         );
