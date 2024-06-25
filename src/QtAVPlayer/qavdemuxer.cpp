@@ -323,7 +323,6 @@ static int apply_bsf(const QString &bsf, AVFormatContext *ctx, AVBSFContext *&bs
 
 int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
 {
-    // DEBUG(url);
     Q_D(QAVDemuxer);
     QMutexLocker locker(&d->mutex);
 
@@ -381,17 +380,14 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
         }
     }
 
-    DEBUG("duration :"<<d->ctx->duration);
     AVDictionary *opts = nullptr;
     for (const auto & key: d->inputOptions.keys())
         av_dict_set(&opts, key.toUtf8().constData(), d->inputOptions[key].toUtf8().constData(), 0);
     locker.unlock();
-    DEBUG("duration :"<<d->ctx->duration);
     int ret = avformat_open_input(&d->ctx, url.toUtf8().constData(), inputFormat, &opts);
     if (ret < 0)
         return ret;
 
-    DEBUG("duration :"<<d->ctx->duration);
     ret = avformat_find_stream_info(d->ctx, NULL);
     if (ret < 0)
         return ret;
@@ -404,17 +400,11 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
     if (d->ctx->pb)
         d->seekable |= bool(d->ctx->pb->seekable);
 
-    // if(url.endsWith(".m3u.")
-    //     || url.endsWith(".m3u8.")
-    //     || url.endsWith(".m3u8")
-    //     || url.endsWith(".m3u"))
-    //     d->seekable = true;
 #else
     // TODO: Search and implement replacement function for seek
     d->seekable = true;
 #endif
 
-    DEBUG("duration :"<<d->ctx->duration);
     ret = resetCodecs();
     if (ret < 0)
         return ret;
@@ -426,7 +416,7 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
         -1,
         nullptr,
         0);
-    DEBUG("duration :"<<d->ctx->duration);
+
     if (videoStreamIndex >= 0)
         d->currentVideoStreams.push_back(d->availableStreams[videoStreamIndex]);
 
@@ -455,8 +445,6 @@ int QAVDemuxer::load(const QString &url, QAVIODevice *dev)
 
     if (!d->bsfs.isEmpty())
         return apply_bsf(d->bsfs, d->ctx, d->bsf_ctx);
-
-    DEBUG("duration :"<<d->ctx->duration);
 
     return 0;
 }

@@ -296,6 +296,7 @@ void QAVPlayerPrivate::setPendingMediaStatus(PendingMediaStatus status)
 
 bool QAVPlayerPrivate::setState(QAVPlayer::State s)
 {
+    DEBUG("");
     Q_Q(QAVPlayer);
     bool result = false;
     {
@@ -385,6 +386,7 @@ void QAVPlayerPrivate::dispatch(T fn)
 
 void QAVPlayerPrivate::setError(QAVPlayer::Error err, const QString &str)
 {
+    DEBUG("");
     Q_Q(QAVPlayer);
     {
         QMutexLocker locker(&stateMutex);
@@ -400,6 +402,7 @@ void QAVPlayerPrivate::setError(QAVPlayer::Error err, const QString &str)
 
 void QAVPlayerPrivate::terminate()
 {
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     setState(QAVPlayer::StoppedState);
     quit = true;
@@ -1124,7 +1127,7 @@ void QAVPlayer::play()
     Q_D(QAVPlayer);
     if (d->url.isEmpty() || d->currentError() == QAVPlayer::ResourceError)
         return;
-
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     if (d->setState(QAVPlayer::PlayingState)) {
         if (d->isEndOfFile()) {
@@ -1144,6 +1147,7 @@ void QAVPlayer::pause()
     if (d->currentError() == QAVPlayer::ResourceError)
         return;
 
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     if (d->setState(QAVPlayer::PausedState)) {
         if (d->isEndOfFile()) {
@@ -1165,6 +1169,7 @@ void QAVPlayer::stop()
     if (d->currentError() == QAVPlayer::ResourceError)
         return;
 
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     if (d->setState(QAVPlayer::StoppedState)) {
         d->setPendingMediaStatus(StoppingMedia);
@@ -1182,6 +1187,7 @@ void QAVPlayer::stepForward()
     if (d->currentError() == QAVPlayer::ResourceError)
         return;
 
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     d->setState(QAVPlayer::PausedState);
     if (d->isEndOfFile()) {
@@ -1200,6 +1206,7 @@ void QAVPlayer::stepBackward()
     if (d->currentError() == QAVPlayer::ResourceError)
         return;
 
+    DEBUG("");
     qCDebug(lcAVPlayer) << __FUNCTION__;
     d->setState(QAVPlayer::PausedState);
     const qint64 pos = d->pts() > 0 ? (d->pts() - videoFrameRate()) * 1000 : duration();
@@ -1217,9 +1224,11 @@ bool QAVPlayer::isSeekable() const
 
 void QAVPlayer::seek(qint64 pos)
 {
+    DEBUG("");
     Q_D(QAVPlayer);
     if ((duration() > 0 && pos > duration()) || d->currentError() == QAVPlayer::ResourceError)
         return;
+
 
     qCDebug(lcAVPlayer) << __FUNCTION__ << ":" << "pos:" << pos;
     {
