@@ -19,7 +19,7 @@
 #include <QtMultimedia/private/qvideotexturehelper_p.h>
 #endif
 #endif
-#include <QDebug>
+#include <qtlog/log.h>
 
 extern "C" {
 #include <libswscale/swscale.h>
@@ -175,41 +175,53 @@ QAVVideoFrame QAVVideoFrame::convertTo(AVPixelFormat fmt) const
 
 QImage QAVVideoFrame::image() const
 {
-
-    // Create a SwsContext for converting pixel format if necessary.
-    SwsContext *swsContext = nullptr;
-
-    if(frame()->format != AV_PIX_FMT_RGB24) {
-        swsContext = sws_getContext(size().width(), size().height(), (AVPixelFormat)frame()->format,
-                                    size().width(), size().height(), AV_PIX_FMT_RGB24,
-                                    SWS_BILINEAR, nullptr, nullptr, nullptr);
-
-        if (!swsContext) {
-            qWarning() << __FUNCTION__ << "Could not create SwsContext";
-            return QImage();
-        }
+    if (!frame()) {
+        return QImage();
     }
 
-    // Allocate memory for the QImage.
-    QImage image(frame()->width, frame()->height, QImage::Format_RGB888);
-
-    // Set the data pointer of the QImage.
-    uint8_t *destData[1] = {image.bits()};
-    int destLinesize[1] = {static_cast<int>(image.bytesPerLine())};
-    if (swsContext) {
-        sws_scale(swsContext, frame()->data, frame()->linesize,
-                  0, frame()->height, destData, destLinesize);
-    } else {
-        // If pixel format is already RGB, just copy the data.
-        memcpy(destData[0], frame()->data[0], frame()->linesize[0] * frame()->height);
+    auto mapData = map();
+    if (mapData.format == AV_PIX_FMT_NONE) {
+        WARNING("Could not map:" << formatName());
+        return QImage();
     }
 
-    // Cleanup the SwsContext if created.
-    if (swsContext) {
-        sws_freeContext(swsContext);
+    // Determine the number of bytes per pixel
+    int bytesPerPixel = 3; // For QImage::Format_RGB888
+
+
+
+    // Convert the image to a format that QImage understands
+    auto ctx = sws_getContext(size().width(), size().height(), mapData.format,
+                              size().width(), size().height(), AV_PIX_FMT_RGB24,
+                              SWS_BICUBIC, NULL, NULL, NULL);
+
+    if (ctx == NULL) {
+        WARNING("Could not get sws context:" << formatName());
+        return QImage();
     }
 
-    return image;
+    int ret = sws_setColorspaceDetails(ctx, sws_getCoefficients(SWS_CS_ITU601),
+                                       0, sws_getCoefficients(SWS_CS_ITU709), 0, 0, 1 << 16, 1 << 16);
+    if (ret == -1) {
+        WARNING("Colorspace not support");
+        return QImage();
+    }
+
+    // Allocate memory for the converted frame
+    uint8_t *data[4];
+    int linesize[4];
+    av_image_alloc(data, linesize, frame()->width, frame()->height, AV_PIX_FMT_RGB24, 1);
+
+    // Convert the frame
+    sws_scale(ctx, mapData.data, mapData.bytesPerLine, 0, frame()->height, data, linesize);
+
+    // Create the QImage
+    QImage img(data[0], frame()->width, frame()->height, linesize[0], QImage::Format_RGB888);
+
+    // Clean up
+    sws_freeContext(ctx);
+    // av_freep(&data[0]);
+    return img.copy(); // Make a deep copy of the image
 }
 
 #ifdef QT_AVPLAYER_MULTIMEDIA

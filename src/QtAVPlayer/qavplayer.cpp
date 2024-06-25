@@ -25,6 +25,7 @@
 
 #include <qtlog/log.h>
 #include <cpp-http/httplib.h>
+#include <QUrl>
 
 extern "C" {
 #include <libavformat/avformat.h>
