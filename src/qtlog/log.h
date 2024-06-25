@@ -4,5 +4,6 @@
 #include <QDebug>
 
 #define DEBUG(...) qDebug()<<__FUNCTION__<<__LINE__<<__VA_ARGS__;
+#define WARNING(...) qWarning()<<__FUNCTION__<<__LINE__<<__VA_ARGS__;
 
 #endif // LOG_H

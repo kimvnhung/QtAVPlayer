@@ -24,6 +24,7 @@
 #include <functional>
 
 #include <qtlog/log.h>
+#include <cpp-http/httplib.h>
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -161,10 +162,82 @@ public:
     QList<QString> filterDescs;
     QAVFilters filters;
 
+    // Custom sources
     mutable QMutex consumersMutex;
     QList<QAbstractAVFrameConsumer<QAVFrame>*> consumers;
     void addConsumer(QAbstractAVFrameConsumer<QAVFrame> *consumer);
+
+    double reloadDuration();
 };
+
+double QAVPlayerPrivate::reloadDuration()
+{
+    // Http Get to url
+    QUrl pUrl(url);
+    httplib::Client cli(pUrl.host().toStdString(),pUrl.port());
+
+    auto res = cli.Get(pUrl.path().toStdString().c_str());
+    // DEBUG("Get response from url: "<<res->location);
+    if (!res || res->status != 200) {
+        WARNING("Failed to get response from url" << cli.host() << cli.port());
+    }else {
+        //     XTM3U
+        // #EXT-X-VERSION:3
+        // #EXT-X-TARGETDURATION:16
+        // #EXT-X-MEDIA-SEQUENCE:0
+        // #EXTINF:13.979000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c0.ts
+        // #EXTINF:16.008000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c1.ts
+        // #EXTINF:13.994000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c2.ts
+        // #EXTINF:15.974000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c3.ts
+        // #EXTINF:14.001000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c4.ts
+        // #EXTINF:15.995000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c5.ts
+        // #EXTINF:13.990000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c6.ts
+        // #EXTINF:15.990000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c7.ts
+        // #EXTINF:13.992000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c8.ts
+        // #EXTINF:16.085000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c9.ts
+        // #EXTINF:13.977000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c10.ts
+        // #EXTINF:15.995000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c11.ts
+        // #EXTINF:13.973000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c12.ts
+        // #EXTINF:16.014000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c13.ts
+        // #EXTINF:13.977000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c14.ts
+        // #EXTINF:16.005000,
+        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c15.ts
+        // DEBUG("Get response from url:" << res->body);
+        QStringList lines = QString::fromStdString(res->body).split("\n");
+        double duration = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            QString line = lines.at(i);
+            // DEBUG("Line:" << line);
+            if (line.contains("#EXTINF:")) {
+                QStringList parts = line.split(":");
+                if (parts.size() == 2) {
+                    QStringList parts2 = parts.at(1).split(",");
+                    if (parts2.size() == 2) {
+                        duration += parts2.at(0).toDouble();
+                    }
+                }
+            }
+        }
+        DEBUG("Duration:" << duration);
+        return duration;
+    }
+    return 0;
+}
 
 static QString err_str(int err)
 {
@@ -531,8 +604,17 @@ void QAVPlayerPrivate::doLoad()
     applyFilters(true, {});
     dispatch([this]() -> void {
         qCDebug(lcAVPlayer) << "[" << url << "]: Loaded, seekable:" << demuxer.seekable() << ", duration:" << demuxer.duration();
-        setSeekable(demuxer.seekable());
-        setDuration(demuxer.duration());
+        if((url.endsWith(".m3u8") || url.endsWith(".m3u.")) && demuxer.duration() == 0)
+        {
+            DEBUG("m3u8 file with no duration, reload it");
+            setDuration(reloadDuration());
+            setSeekable(true);
+        }
+        else
+        {
+            setSeekable(demuxer.seekable());
+            setDuration(demuxer.duration());
+        }
         setVideoFrameRate(demuxer.videoFrameRate());
         step(false);
     });
