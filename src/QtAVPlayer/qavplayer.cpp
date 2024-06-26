@@ -26,6 +26,7 @@
 #include <qtlog/log.h>
 #include <cpp-http/httplib.h>
 #include <QUrl>
+#include <QXmlStreamReader>
 
 extern "C" {
 #include <libavformat/avformat.h>
@@ -175,63 +176,54 @@ double QAVPlayerPrivate::reloadDuration()
 {
     // Http Get to url
     QUrl pUrl(url);
-    httplib::Client cli(pUrl.host().toStdString(),pUrl.port());
+    httplib::Client cli(pUrl.host().toStdString(),pUrl.port()>0?pUrl.port():80);
 
     auto res = cli.Get(pUrl.path().toStdString().c_str());
     // DEBUG("Get response from url: "<<res->location);
     if (!res || res->status != 200) {
         WARNING("Failed to get response from url" << cli.host() << cli.port());
     }else {
-        //     XTM3U
-        // #EXT-X-VERSION:3
-        // #EXT-X-TARGETDURATION:16
-        // #EXT-X-MEDIA-SEQUENCE:0
-        // #EXTINF:13.979000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c0.ts
-        // #EXTINF:16.008000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c1.ts
-        // #EXTINF:13.994000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c2.ts
-        // #EXTINF:15.974000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c3.ts
-        // #EXTINF:14.001000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c4.ts
-        // #EXTINF:15.995000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c5.ts
-        // #EXTINF:13.990000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c6.ts
-        // #EXTINF:15.990000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c7.ts
-        // #EXTINF:13.992000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c8.ts
-        // #EXTINF:16.085000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c9.ts
-        // #EXTINF:13.977000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c10.ts
-        // #EXTINF:15.995000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c11.ts
-        // #EXTINF:13.973000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c12.ts
-        // #EXTINF:16.014000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c13.ts
-        // #EXTINF:13.977000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c14.ts
-        // #EXTINF:16.005000,
-        // 1dfe2927-61fa-4e20-96eb-a4f949527e1c15.ts
-        // DEBUG("Get response from url:" << res->body);
-        QStringList lines = QString::fromStdString(res->body).split("\n");
         double duration = 0;
-        for (int i = 0; i < lines.size(); i++) {
-            QString line = lines.at(i);
-            // DEBUG("Line:" << line);
-            if (line.contains("#EXTINF:")) {
-                QStringList parts = line.split(":");
-                if (parts.size() == 2) {
-                    QStringList parts2 = parts.at(1).split(",");
-                    if (parts2.size() == 2) {
-                        duration += parts2.at(0).toDouble();
+
+        //     XTM3U file
+        // Check if url is hls link
+        if (res->body.find("#EXTM3U") != std::string::npos) {
+            // DEBUG("This is a m3u8 file");
+            QStringList lines = QString::fromStdString(res->body).split("\n");
+
+            for (int i = 0; i < lines.size(); i++) {
+                QString line = lines.at(i);
+                // DEBUG("Line:" << line);
+                if (line.contains("#EXTINF:")) {
+                    QStringList parts = line.split(":");
+                    if (parts.size() == 2) {
+                        QStringList parts2 = parts.at(1).split(",");
+                        if (parts2.size() == 2) {
+                            duration += parts2.at(0).toDouble();
+                        }
                     }
                 }
+            }
+        }
+        // Check if url is mpeg-dash link
+        else if (res->body.find("MPD") != std::string::npos) {
+            DEBUG("This is a mpeg-dash file");
+            QXmlStreamReader xml(QString::fromStdString(res->body));
+            while (!xml.atEnd() && !xml.hasError()) {
+                xml.readNext();
+                if (xml.isStartElement() && xml.name().toString() == "SegmentList") {
+                    QXmlStreamAttributes attributes = xml.attributes();
+                    if (attributes.hasAttribute("duration")) {
+                        QString tempDuration = attributes.value("duration").toString();
+                        duration = tempDuration.toDouble()/1000;
+                    }
+                    // No need to continue once we have found the duration
+                    break;
+                }
+            }
+
+            if (xml.hasError()) {
+                qDebug() << "Error parsing XML:" << xml.errorString();
             }
         }
         DEBUG("Duration:" << duration);
@@ -605,7 +597,7 @@ void QAVPlayerPrivate::doLoad()
     applyFilters(true, {});
     dispatch([this]() -> void {
         qCDebug(lcAVPlayer) << "[" << url << "]: Loaded, seekable:" << demuxer.seekable() << ", duration:" << demuxer.duration();
-        if((url.endsWith(".m3u8") || url.endsWith(".m3u.")) && demuxer.duration() == 0)
+        if((url.endsWith(".m3u8") || url.endsWith(".m3u.") || url.endsWith("manifest.mpd")) && demuxer.duration() == 0)
         {
             DEBUG("m3u8 file with no duration, reload it");
             setDuration(reloadDuration());
